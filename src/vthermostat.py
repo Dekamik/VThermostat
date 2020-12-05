@@ -63,16 +63,19 @@ class VThermostat:
             self.temperature = self.actions.read_temperature()
         except ValueError:
             logging.critical("Could not read temperature. Check if temperatureReadoutCmd is valid in app.conf.")
+            raise
         try:
             if self.use_heater:
                 self.is_heater_on = self.actions.heater_status()
         except ValueError:
             logging.critical("Could not read fan status. Check if fanCheckCmd is valid in app.conf.")
+            raise
         try:
             if self.use_fan:
                 self.is_fan_on = self.actions.fan_status()
         except ValueError:
             logging.critical("Could not read heater status. Check if heaterChecmCmd is valid in app.conf.")
+            raise
         logging.debug("OK")
 
     def validate(self):
@@ -91,13 +94,13 @@ class VThermostat:
         logging.info("FAN         : " + helpers.Formats.on_off_na(self.is_fan_on, self.use_fan))
 
         if self.min is not None and self.max is not None:
-            if self.temperature < self.min and not self.is_heater_on:
+            if self.temperature is not None and self.temperature < self.min and not self.is_heater_on:
                 if self.use_heater:
                     self.turn_heater_on = True
                 if self.is_fan_on:
                     self.turn_fan_on = False
 
-            elif self.temperature > self.max and not self.is_fan_on:
+            elif self.temperature is not None and self.temperature > self.max and not self.is_fan_on:
                 self.turn_fan_on = True
                 if self.is_heater_on:
                     self.turn_heater_on = False
