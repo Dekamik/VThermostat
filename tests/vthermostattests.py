@@ -8,8 +8,9 @@ from src.actionwrapper import DeviceStatus
 
 class VThermostatTests(unittest.TestCase):
     def setUp(self):
+        self.logger = MagicMock()
         self.actions = MagicMock()
-        self.thermostat = VThermostat(self.actions)
+        self.thermostat = VThermostat(self.actions, self.logger)
 
     def test_parse_args__min__min_set(self):
         self.thermostat.parse_args(["--min", "1"])
@@ -35,8 +36,8 @@ class VThermostatTests(unittest.TestCase):
         self.thermostat.parse_args(["--fan", "off"])
         self.assertEqual(False, self.thermostat.turn_fan_on)
 
-    def test_parse_readouts__any_condition__readout_methods_called(self):
-        self.thermostat.parse_readouts()
+    def test_read_sensors__any_condition__readout_methods_called(self):
+        self.thermostat.read_sensors()
         self.actions.read_temperature.assert_called_once()
         self.actions.heater_status.assert_called_once()
         self.actions.fan_status.assert_called_once()
