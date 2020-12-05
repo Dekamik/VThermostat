@@ -11,9 +11,8 @@ class DeviceStatus(Enum):
 
 
 class ActionWrapper:
-    def __init__(self):
-        self.config = configparser.ConfigParser()
-        self.config.read("app.conf")
+    def __init__(self, config: configparser.ConfigParser):
+        self.config = config
 
     def read_temperature(self):
         logging.debug("read_temperature")

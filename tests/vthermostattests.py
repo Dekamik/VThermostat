@@ -10,7 +10,7 @@ class VThermostatTests(unittest.TestCase):
     def setUp(self):
         self.logger = MagicMock()
         self.actions = MagicMock()
-        self.thermostat = VThermostat(self.actions, self.logger)
+        self.thermostat = VThermostat(self.actions)
 
     def test_parse_args__min__min_set(self):
         self.thermostat.parse_args(["--min", "1"])

@@ -1,17 +1,22 @@
 #!/user/bin/env python
+import configparser
 import logging
 import sys
 
-from actionwrapper import ActionWrapper
-from actionwrapper import DeviceStatus
+import actionwrapper
+import helpers
+from logging.config import fileConfig
 
 
 class VThermostat:
-    def __init__(self, actions: ActionWrapper):
+    def __init__(self, config: configparser.ConfigParser, actions: actionwrapper.ActionWrapper):
         logging.debug("__init__")
+        self.config = config
         self.actions = actions
 
-        self.usage = sys.argv[0] + " [--min n] [--max n] [--heater on/off] [--fan on/off] [--help]"
+        self.usage = sys.argv[0] + " [--min n] [--max n] [--heater on/off] [--fan on/off] [--help/-h]"
+        self.use_heater = config.get("settings", "useHeater")
+        self.use_fan = config.get("settings", "useFan")
 
         self.min = None
         self.max = None
@@ -39,7 +44,7 @@ class VThermostat:
                 elif arg == "--fan":
                     self.turn_fan_on = args[i + 1] == "on"
 
-                elif arg == "--help" or len(args) == 1:
+                elif arg == "--help" or arg == "-h" or len(args) == 1:
                     print(self.usage)
                     exit(0)
 
@@ -59,11 +64,13 @@ class VThermostat:
         except ValueError:
             logging.critical("Could not read temperature. Check if temperatureReadoutCmd is valid in app.conf.")
         try:
-            self.is_heater_on = self.actions.heater_status()
+            if self.use_heater:
+                self.is_heater_on = self.actions.heater_status()
         except ValueError:
             logging.critical("Could not read fan status. Check if fanCheckCmd is valid in app.conf.")
         try:
-            self.is_fan_on = self.actions.fan_status()
+            if self.use_fan:
+                self.is_fan_on = self.actions.fan_status()
         except ValueError:
             logging.critical("Could not read heater status. Check if heaterChecmCmd is valid in app.conf.")
         logging.debug("OK")
@@ -79,13 +86,14 @@ class VThermostat:
 
     def check_temperature(self):
         logging.debug("check_temperature...")
-        logging.info("TEMPERATURE : " + self.temperature + "°C")
-        logging.info("HEATER      : " + "ON" if self.is_heater_on else "OFF")
-        logging.info("FAN         : " + "ON" if self.is_fan_on else "OFF")
+        logging.info("TEMPERATURE : " + str(self.temperature) + "°C")
+        logging.info("HEATER      : " + helpers.Formats.on_off_na(self.is_heater_on, self.use_heater))
+        logging.info("FAN         : " + helpers.Formats.on_off_na(self.is_fan_on, self.use_fan))
 
         if self.min is not None and self.max is not None:
             if self.temperature < self.min and not self.is_heater_on:
-                self.turn_heater_on = True
+                if self.use_heater:
+                    self.turn_heater_on = True
                 if self.is_fan_on:
                     self.turn_fan_on = False
 
@@ -94,38 +102,41 @@ class VThermostat:
                 if self.is_heater_on:
                     self.turn_heater_on = False
 
-        logging.info("Heater should be " + "ON" if self.turn_heater_on else "OFF")
-        logging.info("Fan should be " + "ON" if self.turn_fan_on else "OFF")
+        logging.info("Heater should be " + helpers.Formats.on_off(self.turn_heater_on))
+        logging.info("Fan should be " + helpers.Formats.on_off(self.turn_fan_on))
         logging.debug("OK")
 
     def do_actions(self):
         logging.debug("do_actions...")
         # Heater
-        if self.turn_heater_on is not None:
+        if self.use_heater and self.turn_heater_on is not None:
             if not self.is_heater_on and self.turn_heater_on:
-                self.actions.heater(DeviceStatus.ON)
+                self.actions.heater(actionwrapper.DeviceStatus.ON)
                 logging.info("Heater turned ON")
 
             elif self.is_heater_on and not self.turn_heater_on:
-                self.actions.heater(DeviceStatus.OFF)
+                self.actions.heater(actionwrapper.DeviceStatus.OFF)
                 logging.info("Heater turned OFF")
 
         # Fan
-        if self.turn_fan_on is not None:
+        if self.use_fan and self.turn_fan_on is not None:
             if not self.is_fan_on and self.turn_fan_on:
-                self.actions.fan(DeviceStatus.ON)
+                self.actions.fan(actionwrapper.DeviceStatus.ON)
                 logging.info("Fan turned ON")
 
             elif self.is_fan_on and not self.turn_fan_on:
-                self.actions.fan(DeviceStatus.OFF)
+                self.actions.fan(actionwrapper.DeviceStatus.OFF)
                 logging.info("Fan turned OFF")
 
         logging.debug("OK")
 
 
 if __name__ == "__main__":
-    thermostat = VThermostat(ActionWrapper())
+    app_config = configparser.ConfigParser()
+    app_config.read("app.conf")
+    fileConfig(fname=app_config.get("settings", "loggingConfigFile"))
 
+    thermostat = VThermostat(app_config, actionwrapper.ActionWrapper(app_config))
     thermostat.parse_args(sys.argv)
     thermostat.read_sensors()
     thermostat.validate()
